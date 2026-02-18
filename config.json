@@ -3,19 +3,49 @@
         "presence": {
             "status": "online",
             "activities": [{
-                "name": "Your staff",
+                "name": "Helping Staff",
                 "type": "WATCHING"
             }]
         }
+    },
+    "minecraft": {
+        "servers": [{
+            "name": "Divine Shifter",
+            "ip": "Divine Shifter",
+            "port": 25565,
+            "channelId": "1361757965014798526",
+            "messageId": "1361782035923992848",
+            "updateInterval": 30000,
+            "display": {
+                "type": "banner",
+                "banner": {
+                    "url": "https://cdn.discordapp.com/attachments/1361027416272797959/1361766298492866701/standard.gif?ex=67fff331&is=67fea1b1&hm=a49eee30b71b4252a57c3ac1c19f4d60651ca1959d0e8cde39cbc8f55bfc65fd&",
+                    "enabled": true
+                },
+                "chart": {
+                    "enabled": true,
+                    "historyHours": 24,
+                    "color": "#3498db"
+                },
+                "showNextUpdate": true
+            }
+        }]
     },
     "embed": {
         "colors": {
             "online": "#00ff00",
             "offline": "#ff0000"
         },
-        "title": "Divine Shifter Status",
+        "title": "Divine Shifter",
         "footer": {
-            "text": "Made with ❤️ by House Of Visionary"
+            "text": "Made by Team House Of Visionary",
+            "iconURL": "https://github.com/blik.png"
         }
+    },
+    "credits": {
+        "author": "Divine Shifter",
+        "youtube": "https://www.youtube.com/@Divine_Shifter",
+        "discord": "Divine.blk",
+        "github": "https://github.com/divine"
     }
 }
