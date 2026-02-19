@@ -207,10 +207,11 @@ client.once('ready', () => {
     const presence = config.bot.presence;
     client.user.setPresence({
         status: presence.status,
-        activities: presence.activities.map(activity => ({
-            name: activity.name,
-            type: ActivityType[activity.type]
-        }))
+activities: presence.activities.map(activity => ({
+    name: activity.name,
+    type: activity.type
+}))
+
     });
 
     // Initialize status updates for all configured servers
@@ -463,4 +464,5 @@ app.listen(PORT, () => {
 });
 
 // Start the bot
+
 client.login(process.env.DISCORD_TOKEN); 
