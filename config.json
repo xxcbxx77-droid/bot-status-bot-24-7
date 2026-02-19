@@ -1,13 +1,13 @@
 {
-    "bot": {
-        "presence": {
-            "status": "online",
-            "activities": [{
-                "name": "Helping Staff",
-                "type": 3
-            }]
-        }
-    },
+"bot": {
+  "presence": {
+    "status": "online",
+    "activities": [{
+      "name": "over DSCORE",
+      "type": 3
+    }]
+  }
+},
     "minecraft": {
         "servers": [{
             "name": "Divine Shifter",
