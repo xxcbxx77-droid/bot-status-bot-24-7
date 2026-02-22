@@ -20,7 +20,7 @@ const path = require('path');
 const app = express();
 
 // Load shift command
-const createshiftCommand = require('./commands/createshift');
+const createshiftCommand = require('./Createshift');
 
 // Initialize Discord client with intents
 const client = new Client({
@@ -394,4 +394,5 @@ app.listen(PORT, () => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
 
