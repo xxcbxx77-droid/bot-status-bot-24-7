@@ -162,8 +162,9 @@ client.once('ready', async () => {
     // Initialize status updates for all configured servers
     initializeStatusUpdates();
 
-    // ── Initialize Flight Schedule embed on startup ──
+    // ── Initialize Flight Schedule embed + timers on startup ──
     try {
+        createshiftCommand.initShiftTimers(client);
         const shiftData = createshiftCommand.loadShiftData();
         await createshiftCommand.updateFlightSchedule(client, shiftData.shifts);
         log.success('Flight Schedule embed initialized');
@@ -393,5 +394,4 @@ app.listen(PORT, () => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
-
 
