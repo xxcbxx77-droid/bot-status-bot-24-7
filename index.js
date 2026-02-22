@@ -200,19 +200,13 @@ async function generatePlayerChart(serverId, color = '#3498db') {
 }
 
 // Bot ready event
-client.once('ready', () => {
-    log.success(`Logged in as ${client.user.tag}`);
-    
-    // Set custom presence from config
-    const presence = config.bot.presence;
-    client.user.setPresence({
-        status: presence.status,
-activities: presence.activities.map(activity => ({
-    name: activity.name,
-    type: activity.type
-}))
-
-    });
+client.user.setPresence({
+    status: presence.status,
+    activities: presence.activities.map(activity => ({
+        name: activity.name,
+        type: ActivityType[activity.type] || ActivityType.Playing // mapowanie na enum
+    }))
+});
 
     // Initialize status updates for all configured servers
     initializeStatusUpdates();
@@ -466,3 +460,4 @@ app.listen(PORT, () => {
 // Start the bot
 
 client.login(process.env.DISCORD_TOKEN); 
+
