@@ -4,22 +4,19 @@ const path = require('path');
 
 const SHIFT_CHANNEL_ID = '1459462632405995602';
 const ALLOWED_ROLE_ID = '1459863461986304071';
-const SHIFT_DATA_FILE = path.join(__dirname, '../data/shifts.json');
+const SHIFT_DATA_FILE = path.join(__dirname, 'data/shifts.json');
 
 const LOCATIONS = {
     DPI: {
         name: 'De Pride Isle Sanatorium',
-        short: 'DPI',
         link: 'https://www.roblox.com/games/128048309238244/De-Pride-Isle-Sanatorium'
     },
     LBE: {
         name: 'Les Beyond East',
-        short: 'LBE',
         link: 'https://www.roblox.com/games/134056984965568/Les-Beyond-East'
     },
     GPCA: {
         name: 'Gaymoria Peak Church Asylum',
-        short: 'GPCA',
         link: 'https://www.roblox.com/games/97277725160308/Gaymoria-Peak-Church-Asylum'
     }
 };
@@ -47,7 +44,7 @@ function saveShiftData(data) {
 function getRelativeTime(timestamp) {
     const now = Date.now();
     const diff = timestamp - now;
-    if (diff <= 0) return 'teraz';
+    if (diff <= 0) return 'now';
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
@@ -61,23 +58,23 @@ function formatDate(timestamp) {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const months = ['January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'];
-    const dayName = days[date.getDay()];
-    const day = date.getDate();
-    const month = months[date.getMonth()];
-    const year = date.getFullYear();
-    const hours = String(date.getHours()).padStart(2, '0');
-    const mins = String(date.getMinutes()).padStart(2, '0');
-    return `${dayName}, ${day} ${month} ${year} ${hours}:${mins}`;
+    return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function getCurrentTime() {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 }
 
 function buildEmbed(shifts) {
     const embed = new EmbedBuilder()
-        .setColor(0x5865F2)
-        .setTitle('✈️ Flight Schedule')
-        .setDescription('**LeMonde Airlines Flights**\nConnecting the World since 2014.');
+        .setColor(0x3b086b)
+        .setTitle('Shifts Schedule')
+        .setDescription('__**Divine Shifter Shifts**__\n-# Est 2026.');
 
     if (shifts.length === 0) {
-        embed.setFooter({ text: 'No upcoming flights scheduled.' });
+        // Brak shiftów - tylko nagłówek + czas na dole
+        embed.setFooter({ text: `Last updated: ${getCurrentTime()}` });
         return embed;
     }
 
@@ -90,17 +87,17 @@ function buildEmbed(shifts) {
         const duration = SHIFT_DURATIONS[shift.type];
 
         embed.addFields({
-            name: `🚫 LMD ${shift.flightNumber} (${shift.createdBy})`,
+            name: ` DS ${shift.flightNumber} (${shift.createdBy})`,
             value: [
-                ` [${loc.name}](${loc.link})`,
-                ` ${shift.type} — ⏱️ ${duration} min`,
-                ` ${formatted} (${relative})`
+                `•  [${loc.name}](${loc.link})`,
+                `•  ${shift.type} — ⏱️ ${duration} min`,
+                `•  ${formatted} (${relative})`
             ].join('\n'),
             inline: false
         });
     }
 
-    embed.setFooter({ text: `Total flights: ${shifts.length}` }).setTimestamp();
+    embed.setFooter({ text: `Total shifts: ${shifts.length} • Last updated: ${getCurrentTime()}` });
     return embed;
 }
 
@@ -117,7 +114,7 @@ async function updateFlightSchedule(client, shifts) {
             await msg.edit({ embeds: [embed] });
             return;
         } catch {
-            // Message deleted, create new
+            // Wiadomość usunięta - tworzymy nową
         }
     }
 
@@ -127,14 +124,12 @@ async function updateFlightSchedule(client, shifts) {
     saveShiftData(data);
 }
 
-// Schedule auto-removal for a single shift when it ends
 function scheduleShiftRemoval(client, shift) {
     const duration = SHIFT_DURATIONS[shift.type] || 45;
-    // End time = when shift starts + duration
     const endTime = shift.timestamp + duration * 60 * 1000;
     const delay = endTime - Date.now();
 
-    if (delay <= 0) return; // already over
+    if (delay <= 0) return;
 
     setTimeout(async () => {
         const data = loadShiftData();
@@ -143,27 +138,26 @@ function scheduleShiftRemoval(client, shift) {
         if (data.shifts.length !== before) {
             saveShiftData(data);
             await updateFlightSchedule(client, data.shifts);
-            console.log(`[SHIFT] ✅ Auto-removed LMD ${shift.flightNumber} (${shift.type}, ${duration} min ended)`);
+            console.log(`[SHIFT] ✅ Auto-removed DS ${shift.flightNumber} (${shift.type}, ${duration} min ended)`);
         }
     }, delay);
 
-    console.log(`[SHIFT] ⏳ LMD ${shift.flightNumber} ends in ${Math.round(delay / 60000)} min`);
+    console.log(`[SHIFT] ⏳ DS ${shift.flightNumber} ends in ${Math.round(delay / 60000)} min`);
 }
 
-// Called on bot startup — clean expired shifts and set timers for active ones
 function initShiftTimers(client) {
     const data = loadShiftData();
     const now = Date.now();
 
-    const activeBefore = data.shifts.length;
+    const before = data.shifts.length;
     data.shifts = data.shifts.filter(shift => {
         const duration = SHIFT_DURATIONS[shift.type] || 45;
         return (shift.timestamp + duration * 60 * 1000) > now;
     });
 
-    if (data.shifts.length !== activeBefore) {
+    if (data.shifts.length !== before) {
         saveShiftData(data);
-        console.log(`[SHIFT] Cleaned ${activeBefore - data.shifts.length} expired shift(s) on startup`);
+        console.log(`[SHIFT] Cleaned ${before - data.shifts.length} expired shift(s) on startup`);
     }
 
     for (const shift of data.shifts) {
@@ -179,7 +173,7 @@ module.exports = {
         .setDescription('Create new shift')
         .addStringOption(opt =>
             opt.setName('location')
-                .setDescription('location shift')
+                .setDescription('location of shift')
                 .setRequired(true)
                 .addChoices(
                     { name: 'DPI - De Pride Isle Sanatorium', value: 'DPI' },
@@ -198,13 +192,13 @@ module.exports = {
                 ))
         .addStringOption(opt =>
             opt.setName('date')
-                .setDescription('Data (format: YYYY-MM-DD HH:MM np. 2026-02-22 19:00)')
+                .setDescription('Date shift (format: YYYY-MM-DD HH:MM ex. 2026-02-22 19:00)')
                 .setRequired(true)),
 
     async execute(interaction) {
         if (!interaction.member.roles.cache.has(ALLOWED_ROLE_ID)) {
             return interaction.reply({
-                content: '❌ERROR',
+                content: '❌ ERROR',
                 ephemeral: true
             });
         }
@@ -216,7 +210,7 @@ module.exports = {
         const timestamp = Date.parse(dateStr.replace(' ', 'T') + ':00');
         if (isNaN(timestamp)) {
             return interaction.reply({
-                content: '❌ ERROR Use: `2026-02-22 19:00`',
+                content: '❌ERROR`',
                 ephemeral: true
             });
         }
@@ -251,11 +245,11 @@ module.exports = {
         const duration = SHIFT_DURATIONS[type];
         await interaction.reply({
             content: [
-                ` Shift **LMD ${flightNumber}** added`,
+                ` Shift **LMD ${flightNumber}** dodany!`,
                 ` ${loc.name}`,
                 ` ${type} — ⏱️ ${duration} min`,
                 ` ${formatDate(timestamp)} (${getRelativeTime(timestamp)})`,
-                ` Shift deleting auto after **${duration} minutes**`
+                ` Deleting after **${duration} minutes**.`
             ].join('\n'),
             ephemeral: true
         });
