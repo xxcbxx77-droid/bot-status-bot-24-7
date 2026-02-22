@@ -19,6 +19,9 @@ const fs = require('fs');
 const path = require('path');
 const app = express();
 
+// Load shift command
+const createshiftCommand = require('./commands/createshift');
+
 // Initialize Discord client with intents
 const client = new Client({
     intents: [
@@ -30,7 +33,7 @@ const client = new Client({
 // Store server status messages and intervals
 const statusMessages = new Map();
 const updateIntervals = new Map();
-const playerHistory = new Map(); // Store player count history
+const playerHistory = new Map();
 
 // Fancy console logging
 const log = {
@@ -72,27 +75,15 @@ function initializePlayerHistory(serverId) {
 function updatePlayerHistory(serverId, playerCount, maxHistory = 24) {
     const history = playerHistory.get(serverId) || [];
     const currentTime = Date.now();
-    
-    // If history is empty or it's been 5 minutes since last record
-    // This will create more frequent records initially until we have enough data
-    const timeBetweenRecords = history.length < 24 ? 300000 : 3600000; // 5 minutes or 1 hour
+    const timeBetweenRecords = history.length < 24 ? 300000 : 3600000;
     
     if (history.length === 0 || 
         (currentTime - history[history.length - 1].timestamp) >= timeBetweenRecords) {
-        history.push({
-            timestamp: currentTime,
-            count: playerCount
-        });
-
-        // Keep only last 24 records
-        if (history.length > maxHistory) {
-            history.shift(); // Remove oldest record
-        }
-
+        history.push({ timestamp: currentTime, count: playerCount });
+        if (history.length > maxHistory) history.shift();
         playerHistory.set(serverId, history);
         log.info(`Updated player history for ${serverId} (${history.length} records)`);
     } else {
-        // Update the latest record
         history[history.length - 1].count = playerCount;
         playerHistory.set(serverId, history);
     }
@@ -111,7 +102,6 @@ async function generatePlayerChart(serverId, color = '#3498db') {
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
 
-    // Set background
     ctx.fillStyle = '#2F3136';
     ctx.fillRect(0, 0, width, height);
 
@@ -130,7 +120,7 @@ async function generatePlayerChart(serverId, color = '#3498db') {
                 label: 'Player Count',
                 data,
                 borderColor: color,
-                backgroundColor: color + '33', // Add transparency
+                backgroundColor: color + '33',
                 borderWidth: 2,
                 tension: 0.4,
                 fill: true,
@@ -140,59 +130,16 @@ async function generatePlayerChart(serverId, color = '#3498db') {
         },
         options: {
             responsive: false,
-            animation: false, // Disable animations for static image
+            animation: false,
             plugins: {
-                legend: {
-                    labels: {
-                        color: '#FFFFFF',
-                        font: {
-                            size: 14
-                        }
-                    }
-                },
-                title: {
-                    display: true,
-                    text: 'Player Count History',
-                    color: '#FFFFFF',
-                    font: {
-                        size: 16,
-                        weight: 'bold'
-                    }
-                }
+                legend: { labels: { color: '#FFFFFF', font: { size: 14 } } },
+                title: { display: true, text: 'Player Count History', color: '#FFFFFF', font: { size: 16, weight: 'bold' } }
             },
             scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: {
-                        color: '#666666',
-                        drawBorder: false
-                    },
-                    ticks: {
-                        color: '#FFFFFF',
-                        font: {
-                            size: 12
-                        },
-                        padding: 10
-                    }
-                },
-                x: {
-                    grid: {
-                        color: '#666666',
-                        drawBorder: false
-                    },
-                    ticks: {
-                        color: '#FFFFFF',
-                        font: {
-                            size: 12
-                        },
-                        maxRotation: 45,
-                        minRotation: 45
-                    }
-                }
+                y: { beginAtZero: true, grid: { color: '#666666', drawBorder: false }, ticks: { color: '#FFFFFF', font: { size: 12 }, padding: 10 } },
+                x: { grid: { color: '#666666', drawBorder: false }, ticks: { color: '#FFFFFF', font: { size: 12 }, maxRotation: 45, minRotation: 45 } }
             },
-            layout: {
-                padding: 20
-            }
+            layout: { padding: 20 }
         }
     });
 
@@ -200,22 +147,29 @@ async function generatePlayerChart(serverId, color = '#3498db') {
 }
 
 // Bot ready event
-client.once('ready', () => {
+client.once('ready', async () => {
     log.success(`Logged in as ${client.user.tag}`);
     
-    // Set custom presence from config
     const presence = config.bot.presence;
     client.user.setPresence({
         status: presence.status,
-activities: presence.activities.map(activity => ({
-    name: activity.name,
-    type: activity.type
-}))
-
+        activities: presence.activities.map(activity => ({
+            name: activity.name,
+            type: activity.type
+        }))
     });
 
     // Initialize status updates for all configured servers
     initializeStatusUpdates();
+
+    // ── Initialize Flight Schedule embed on startup ──
+    try {
+        const shiftData = createshiftCommand.loadShiftData();
+        await createshiftCommand.updateFlightSchedule(client, shiftData.shifts);
+        log.success('Flight Schedule embed initialized');
+    } catch (err) {
+        log.error(`Failed to initialize Flight Schedule: ${err.message}`);
+    }
 });
 
 async function checkServerStatus(ip, port = 25565) {
@@ -231,10 +185,7 @@ async function checkServerStatus(ip, port = 25565) {
         };
     } catch (error) {
         log.error(`Failed to check status for ${ip}:${port} - ${error.message}`);
-        return {
-            online: false,
-            error: error.message
-        };
+        return { online: false, error: error.message };
     }
 }
 
@@ -247,7 +198,6 @@ async function updateServerStatus(serverConfig) {
 
     const status = await checkServerStatus(serverConfig.ip, serverConfig.port);
     
-    // Update player history if server is online
     if (status.online) {
         initializePlayerHistory(serverConfig.channelId);
         updatePlayerHistory(serverConfig.channelId, status.players, serverConfig.display.chart.historyHours);
@@ -258,7 +208,6 @@ async function updateServerStatus(serverConfig) {
         .setColor(status.online ? config.embed.colors.online : config.embed.colors.offline)
         .setTimestamp();
 
-    // Add server info fields
     embed.addFields(
         { name: '📡 Server', value: `${serverConfig.name} (${serverConfig.ip}:${serverConfig.port})`, inline: true },
         { name: '🔌 Status', value: status.online ? '✅ Online' : '❌ Offline', inline: true }
@@ -274,29 +223,19 @@ async function updateServerStatus(serverConfig) {
 
         if (serverConfig.display.showNextUpdate) {
             const nextUpdate = Math.floor((Date.now() + serverConfig.updateInterval) / 1000);
-            embed.addFields({
-                name: '⏱️ Next Update',
-                value: `<t:${nextUpdate}:R>`,
-                inline: true
-            });
+            embed.addFields({ name: '⏱️ Next Update', value: `<t:${nextUpdate}:R>`, inline: true });
         }
     } else {
-        embed.addFields(
-            { name: '❌ Error', value: status.error || 'Could not connect to server' }
-        );
+        embed.addFields({ name: '❌ Error', value: status.error || 'Could not connect to server' });
     }
 
     embed.setFooter(config.embed.footer);
 
     const files = [];
     
-    // Handle display type and images
     if (serverConfig.display.type === 'chart' && serverConfig.display.chart.enabled && status.online) {
         try {
-            const chartBuffer = await generatePlayerChart(
-                serverConfig.channelId,
-                serverConfig.display.chart.color
-            );
+            const chartBuffer = await generatePlayerChart(serverConfig.channelId, serverConfig.display.chart.color);
             if (chartBuffer) {
                 const attachment = new AttachmentBuilder(chartBuffer, { name: 'player-chart.png' });
                 files.push(attachment);
@@ -318,7 +257,6 @@ async function updateServerStatus(serverConfig) {
     try {
         let message;
         
-        // Try to fetch existing message
         if (serverConfig.messageId) {
             try {
                 message = await channel.messages.fetch(serverConfig.messageId);
@@ -328,7 +266,6 @@ async function updateServerStatus(serverConfig) {
             }
         }
 
-        // If message exists, edit it, otherwise create new one
         if (message) {
             await message.edit({ embeds: [embed], files });
         } else {
@@ -344,38 +281,44 @@ async function updateServerStatus(serverConfig) {
 }
 
 function initializeStatusUpdates() {
-    // Clear any existing intervals
-    for (const interval of updateIntervals.values()) {
-        clearInterval(interval);
-    }
+    for (const interval of updateIntervals.values()) clearInterval(interval);
     updateIntervals.clear();
 
-    // Set up new intervals for each server
     for (const server of config.minecraft.servers) {
-        // Initial update
         updateServerStatus(server);
-        
-        // Set up periodic updates
         const interval = setInterval(() => updateServerStatus(server), server.updateInterval);
         updateIntervals.set(server.channelId, interval);
-        
         log.info(`Initialized status updates for ${server.name} (${server.ip}:${server.port})`);
     }
 }
 
-// Status command handler
+// Interaction handler
 client.on('interactionCreate', async interaction => {
     if (!interaction.isCommand()) return;
 
+    // ── /createshift ──
+    if (interaction.commandName === 'createshift') {
+        try {
+            await createshiftCommand.execute(interaction);
+        } catch (error) {
+            log.error(`Error in /createshift: ${error.message}`);
+            const reply = { content: '❌ ERROR', ephemeral: true };
+            if (interaction.replied || interaction.deferred) {
+                await interaction.followUp(reply);
+            } else {
+                await interaction.reply(reply);
+            }
+        }
+        return;
+    }
+
+    // ── /status ──
     if (interaction.commandName === 'status') {
         const serverName = interaction.options.getString('server');
         const server = config.minecraft.servers.find(s => s.name.toLowerCase() === serverName.toLowerCase());
         
         if (!server) {
-            await interaction.reply({
-                content: `Server "${serverName}" not found in configuration!`,
-                ephemeral: true
-            });
+            await interaction.reply({ content: `Server "${serverName}" not found in configuration!`, ephemeral: true });
             return;
         }
 
@@ -396,11 +339,7 @@ client.on('interactionCreate', async interaction => {
 
             if (server.display.showNextUpdate) {
                 const nextUpdate = Math.floor((Date.now() + server.updateInterval) / 1000);
-                embed.addFields({
-                    name: '⏱️ Next Update',
-                    value: `<t:${nextUpdate}:R>`,
-                    inline: true
-                });
+                embed.addFields({ name: '⏱️ Next Update', value: `<t:${nextUpdate}:R>`, inline: true });
             }
         } else {
             embed.addFields(
@@ -412,10 +351,7 @@ client.on('interactionCreate', async interaction => {
         const files = [];
         if (server.display.type === 'chart' && server.display.chart.enabled && status.online) {
             try {
-                const chartBuffer = await generatePlayerChart(
-                    server.channelId,
-                    server.display.chart.color
-                );
+                const chartBuffer = await generatePlayerChart(server.channelId, server.display.chart.color);
                 if (chartBuffer) {
                     const attachment = new AttachmentBuilder(chartBuffer, { name: 'player-chart.png' });
                     files.push(attachment);
@@ -428,24 +364,19 @@ client.on('interactionCreate', async interaction => {
             embed.setImage(server.display.banner.url);
         }
 
-        await interaction.reply({
-            embeds: [embed],
-            files,
-            ephemeral: true
-        });
+        await interaction.reply({ embeds: [embed], files, ephemeral: true });
     }
 });
 
 // Serve static files
 app.use(express.static(path.join(__dirname)));
 
-// Express routes
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'uptimer.html'));
 });
 
 app.get('/status', (req, res) => {
-    const status = {
+    res.json({
         status: 'online',
         uptime: process.uptime(),
         timestamp: new Date().toISOString(),
@@ -453,16 +384,14 @@ app.get('/status', (req, res) => {
             name: server.name,
             ip: server.ip
         }))
-    };
-    res.json(status);
+    });
 });
 
-// Start Express server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     log.info(`Express server is running on port ${PORT}`);
 });
 
-// Start the bot
+client.login(process.env.DISCORD_TOKEN);
 
-client.login(process.env.DISCORD_TOKEN); 
+
